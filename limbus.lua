@@ -73,14 +73,17 @@ function limbus.is_chest_key(id)
     return (id >= 9956 and id <= 9998) or id == 10044 or id == 10045
 end
 
--- Returns 'matter', 'material', 'crafting', or nil for anything that isn't a known Limbus reward.
+-- Returns 'matter', 'material', 'shard', 'crafting', or nil for anything that isn't a known Limbus reward.
 function limbus.reward_category(id)
     if id == 9999 or id == 10000 then
         return 'matter'
     elseif id == 10046 or id == 10047 then
         return 'material'
-    elseif (id >= 10001 and id <= 10023) or (id >= 10028 and id <= 10032) or (id >= 10036 and id <= 10039) then
-        return 'crafting' -- jewels, shards, synthesis materials, Alabaster/Murky parts and cores
+    elseif id >= 10006 and id <= 10010 then
+        return 'shard'
+    elseif (id >= 10001 and id <= 10005) or (id >= 10011 and id <= 10023) or (id >= 10028 and id <= 10032)
+        or (id >= 10036 and id <= 10039) then
+        return 'crafting' -- jewels, synthesis materials, Alabaster/Murky parts and cores
     end
 end
 

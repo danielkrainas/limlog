@@ -1,6 +1,6 @@
 # limlog
 
-A Windower 4 addon for FFXI that tracks which Limbus chests you've opened this week and logs each one to a CSV file.
+A Windower 4 addon for FFXI that tracks which Limbus chests you've opened this week and logs each one to a CSV file for your own records.
 
 In Temenos and Apollyon, a small draggable window shows the zone's towers, with the ones you've opened this week lit up, plus your chest count:
 
@@ -28,14 +28,29 @@ Use `//limlog` or the short form `//lim`.
 | --- | --- |
 | `//limlog status` | Show this week's chests in both zones, from anywhere |
 | `//limlog mark <tower>` | Record a chest the addon missed, such as `//limlog mark nw` |
-| `//limlog unmark <tower>` | Remove this week's latest chest for that tower from the CSV |
+| `//limlog unmark <tower>` | Take one chest for that tower off this week's status. The CSV isn't changed. |
 | `//limlog floortime` | Show or hide the last floor clear time |
 | `//limlog csv` | Show where the CSV is saved |
 | `//limlog help` | List the commands |
 
+## Saved files
+
+Each character gets two files in `data/`:
+
+| File | Purpose |
+| --- | --- |
+| `<character>_chests.csv` | Permanent log of every chest. The addon only ever appends to it, so you can edit, move or delete it without affecting the UI. |
+| `<character>_status.json` | This week's chest status, which the UI reads. It holds only the current week and starts over after the tally. |
+
+The status file looks like this, with the number of times each tower's chest has been opened:
+
+```json
+{"week":"2026-11-02","opened":{"N":2,"W":1}}
+```
+
 ## CSV
 
-Each character has its own file, `data/<character>_chests.csv`, with one row per chest. It's also the addon's only record, so weekly status is rebuilt from it on load. Deleting a row changes your status, and deleting the file resets it.
+There's one row per chest:
 
 | Column | Contents |
 | --- | --- |
@@ -50,10 +65,11 @@ Each character has its own file, `data/<character>_chests.csv`, with one row per
 | `units_total` | Total units of that type after opening |
 | `matter` | Alabaster Matter or Murky Matter |
 | `material` | Alabaster Material or Murky Material |
-| `crafting` | Everything else: shards, synthesis materials, Alabaster and Murky parts and cores, and jewels |
+| `shards` | Shard of Hope, Trust, Bravery, Justice or Mercy |
+| `crafting` | Everything else: synthesis materials, Alabaster and Murky parts and cores, and jewels |
 | `source` | `auto`, or `manual` for `//limlog mark` |
 
-Reward columns are blank if you got nothing of that type. Several items are separated by semicolons, such as `Hydro Oil; Shard of Hope x2`. Unit columns are blank when the numbers aren't known, as on manual rows.
+Reward columns are blank if you got nothing of that type. Several items are separated by semicolons, such as `Hydro Oil x2; Vicuna Cloth`. Unit columns are blank when the numbers aren't known, as on manual rows.
 
 ## How it works
 

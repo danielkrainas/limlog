@@ -38,14 +38,15 @@ local REWARD_DELAY = 5      -- seconds after opening for rewards to land
 local UNITS_DELAY = 2       -- seconds to wait for the final units reply
 
 local CSV_HEADER = 'date_time,week_of,character,zone,tower,floor,chest_no,units_gained,units_total,'
-    .. 'matter,material,crafting,source'
+    .. 'matter,material,shards,crafting,source'
+local CSV_COLUMNS = 14
 
 local ON = '\\cs(100,255,100)'
 local OFF = '\\cs(110,110,110)'
 local END = '\\cr'
 
 local character = nil
-local week = nil        -- this week's chests: { key, opened[tower], count[zone] }
+local week = nil        -- this week's chests: { key, opened[tower] = times opened, count[zone] }
 local chest = nil       -- the chest being opened, until its outcome is known
 local position = nil    -- player x/y at the last tick
 local floor = nil       -- the floor we're on: { name, arrived }
@@ -86,6 +87,79 @@ local function week_key(now)
     return os.date('!%Y-%m-%d', start + JST)
 end
 
+-- Status ------------------------------------------------------------------------------------------
+
+local function find_chest(tower)
+    for _, info in pairs(limbus.chests) do
+        if info.tower == tower then
+            return info
+        end
+    end
+end
+
+local function status_path()
+    return windower.addon_path .. 'data/' .. character .. '_status.json'
+end
+
+-- Status only ever covers the current week, so a file from an earlier week reads as empty.
+local function load_week()
+    week = { key = week_key(os.time()), opened = {}, count = { [37] = 0, [38] = 0 } }
+    if not character then
+        return
+    end
+    local file = io.open(status_path(), 'r')
+    if not file then
+        return
+    end
+    local content = file:read('*a')
+    file:close()
+
+    local key = content:match('"week"%s*:%s*"([^"]*)"')
+    local opened = content:match('"opened"%s*:%s*(%b{})')
+    if not key or not opened then
+        say('Could not read ' .. status_path() .. ', so this week\'s status starts empty.')
+        return
+    end
+    if key ~= week.key then
+        return
+    end
+    for tower, count in opened:gmatch('"(%w+)"%s*:%s*(%d+)') do
+        local info = find_chest(tower)
+        if info then
+            week.opened[tower] = tonumber(count)
+            week.count[info.zone] = week.count[info.zone] + tonumber(count)
+        end
+    end
+end
+
+-- Written to a temp file first, so a crash mid-write can't leave a half-written status behind.
+local function save_week()
+    local towers = {}
+    for _, id in ipairs({ 37, 38 }) do
+        for _, tower in ipairs(limbus.zones[id].towers) do
+            if week.opened[tower] then
+                towers[#towers + 1] = ('"%s":%d'):format(tower, week.opened[tower])
+            end
+        end
+    end
+
+    local path = status_path()
+    local temp = path .. '.tmp'
+    local file, err = io.open(temp, 'w')
+    if not file then
+        say('Could not write ' .. temp .. ': ' .. tostring(err))
+        return
+    end
+    file:write(('{"week":"%s","opened":{%s}}\n'):format(week.key, table.concat(towers, ',')))
+    file:close()
+
+    os.remove(path) -- Windows can't rename onto an existing file
+    local renamed, rename_err = os.rename(temp, path)
+    if not renamed then
+        say('Could not write ' .. path .. ': ' .. tostring(rename_err))
+    end
+end
+
 -- CSV ---------------------------------------------------------------------------------------------
 
 local function csv_path()
@@ -100,48 +174,7 @@ local function csv_field(value)
     return s
 end
 
-local function csv_lines()
-    local lines = {}
-    local file = io.open(csv_path(), 'r')
-    if file then
-        for line in file:lines() do
-            lines[#lines + 1] = line
-        end
-        file:close()
-    end
-    return lines
-end
-
--- week_of, zone and tower never contain commas, and every column before them is comma-free too.
-local function parse_row(line)
-    local key, zone, tower = line:match('^[^,]*,([^,]*),[^,]*,([^,]*),([^,]*),')
-    return key, zone, tower
-end
-
-local function zone_id(name)
-    for id, zone in pairs(limbus.zones) do
-        if zone.name == name then
-            return id
-        end
-    end
-end
-
--- The CSV is the only record, so this week's status is always rebuilt from it.
-local function load_week()
-    week = { key = week_key(os.time()), opened = {}, count = { [37] = 0, [38] = 0 } }
-    if not character then
-        return
-    end
-    for _, line in ipairs(csv_lines()) do
-        local key, zone, tower = parse_row(line)
-        local id = zone_id(zone)
-        if key == week.key and id then
-            week.opened[tower] = true
-            week.count[id] = week.count[id] + 1
-        end
-    end
-end
-
+-- The CSV is an append-only log: nothing here reads it back or rewrites it.
 local function append_row(row)
     local path = csv_path()
     local existing = io.open(path, 'r')
@@ -151,37 +184,17 @@ local function append_row(row)
     local file, err = io.open(path, 'a')
     if not file then
         say('Could not write ' .. path .. ': ' .. tostring(err))
-        return false
+        return
     end
     if not existing then
         file:write(CSV_HEADER, '\n')
     end
     local fields = {}
-    for i = 1, 13 do
+    for i = 1, CSV_COLUMNS do
         fields[i] = csv_field(row[i])
     end
     file:write(table.concat(fields, ','), '\n')
     file:close()
-    return true
-end
-
-local function remove_last_row(tower)
-    local lines = csv_lines()
-    for i = #lines, 2, -1 do
-        local key, _, row_tower = parse_row(lines[i])
-        if key == week.key and row_tower == tower then
-            table.remove(lines, i)
-            local file, err = io.open(csv_path(), 'w')
-            if not file then
-                say('Could not write ' .. csv_path() .. ': ' .. tostring(err))
-                return false
-            end
-            file:write(table.concat(lines, '\n'), '\n')
-            file:close()
-            return true
-        end
-    end
-    return false
 end
 
 -- Display -----------------------------------------------------------------------------------------
@@ -210,13 +223,11 @@ local function refresh()
 end
 
 local function record(info, row)
-    if not append_row(row) then
-        return false
-    end
-    week.opened[info.tower] = true
+    week.opened[info.tower] = (week.opened[info.tower] or 0) + 1
     week.count[info.zone] = week.count[info.zone] + 1
+    save_week()
+    append_row(row)
     refresh()
-    return true
 end
 
 -- Chests ------------------------------------------------------------------------------------------
@@ -273,9 +284,9 @@ local function item_name(id)
     return item and item.en or ('Item ' .. id)
 end
 
--- Items sort by name per category: { matter = 'Murky Matter', crafting = 'Hydro Oil x2; Shard of Hope' }.
+-- Items sort by name per category: { matter = 'Murky Matter', shard = 'Shard of Hope x2', crafting = 'Hydro Oil' }.
 local function sort_rewards(gained)
-    local lists = { matter = {}, material = {}, crafting = {} }
+    local lists = { matter = {}, material = {}, shard = {}, crafting = {} }
     local found = false
     for id, count in pairs(gained) do
         local category = limbus.reward_category(id) or (chest.pool[id] and 'crafting')
@@ -321,24 +332,22 @@ local function finish_chest()
     end
 
     local number = week.count[info.zone] + 1
-    local recorded = record(info, {
+    record(info, {
         os.date('%Y-%m-%d %H:%M:%S'), week.key, character, limbus.zones[info.zone].name, info.tower, info.floor,
-        number, units, chest.units_total, rewards.matter, rewards.material, rewards.crafting, 'auto',
+        number, units, chest.units_total, rewards.matter, rewards.material, rewards.shard, rewards.crafting, 'auto',
     })
 
-    if recorded then
-        local parts = {}
-        if units then
-            parts[#parts + 1] = ('+%s units (%s total)'):format(commas(units), commas(chest.units_total))
-        end
-        for _, category in ipairs({ 'matter', 'material', 'crafting' }) do
-            if rewards[category] ~= '' then
-                parts[#parts + 1] = rewards[category]
-            end
-        end
-        say(('%s%d chest %d/%d: %s'):format(info.tower, info.floor, number, limbus.max_chests,
-            #parts > 0 and table.concat(parts, ', ') or 'nothing detected'))
+    local parts = {}
+    if units then
+        parts[#parts + 1] = ('+%s units (%s total)'):format(commas(units), commas(chest.units_total))
     end
+    for _, category in ipairs({ 'matter', 'material', 'shard', 'crafting' }) do
+        if rewards[category] ~= '' then
+            parts[#parts + 1] = rewards[category]
+        end
+    end
+    say(('%s%d chest %d/%d: %s'):format(info.tower, info.floor, number, limbus.max_chests,
+        #parts > 0 and table.concat(parts, ', ') or 'nothing detected'))
     chest = nil
 end
 
@@ -496,14 +505,6 @@ end)
 
 -- Commands ----------------------------------------------------------------------------------------
 
-local function find_chest(tower)
-    for _, info in pairs(limbus.chests) do
-        if info.tower == tower then
-            return info
-        end
-    end
-end
-
 local function print_status()
     for _, id in ipairs({ 37, 38 }) do
         local zone = limbus.zones[id]
@@ -525,30 +526,32 @@ local function mark(tower)
         return
     end
     local number = week.count[info.zone] + 1
-    if record(info, {
+    record(info, {
         os.date('%Y-%m-%d %H:%M:%S'), week.key, character, limbus.zones[info.zone].name, info.tower, info.floor,
-        number, nil, nil, '', '', '', 'manual',
-    }) then
-        say(('%s marked as opened (%d/%d).'):format(tower, number, limbus.max_chests))
-    end
+        number, nil, nil, '', '', '', '', 'manual',
+    })
+    say(('%s marked as opened (%d/%d).'):format(tower, number, limbus.max_chests))
 end
 
 local function unmark(tower)
-    if not find_chest(tower) then
+    local info = find_chest(tower)
+    if not info then
         say('Unknown tower. Use N, W, E, C, NW, SW, NE or SE.')
-    elseif remove_last_row(tower) then
-        load_week()
-        refresh()
-        say('Removed the latest ' .. tower .. ' chest from this week.')
-    else
+    elseif not week.opened[tower] then
         say('No ' .. tower .. ' chest recorded this week.')
+    else
+        week.opened[tower] = week.opened[tower] > 1 and week.opened[tower] - 1 or nil
+        week.count[info.zone] = week.count[info.zone] - 1
+        save_week()
+        refresh()
+        say('Removed one ' .. tower .. ' chest from this week\'s status. The CSV is unchanged.')
     end
 end
 
 local function print_help()
     say('//limlog status - this week\'s chests in both zones')
     say('//limlog mark <tower> - record a chest the addon missed')
-    say('//limlog unmark <tower> - remove this week\'s latest chest for a tower')
+    say('//limlog unmark <tower> - take one chest off this week\'s status')
     say('//limlog floortime - show or hide the last floor clear time')
     say('//limlog csv - show where the CSV is saved')
 end
