@@ -98,10 +98,6 @@ Reward columns are blank if you got nothing of that type. Several items are sepa
 - **Timing needs a warp onto the floor.** If you load the addon partway through a floor, that floor isn't timed.
 - **Only the eight tower chests are tracked.** Chests from the Central Temenos and Central Apollyon Notorious Monster fights have no known NPC IDs.
 
-## Credits
-
-Chest IDs, floor coordinates and chest detection come from the [superwarp](https://github.com/AkadenTK/superwarp) addon. Limbus details come from [BG-Wiki](https://www.bg-wiki.com/ffxi/Category:Limbus).
-
 ## License
 
 [CC0 1.0 Universal](LICENSE). This work is dedicated to the public domain.
