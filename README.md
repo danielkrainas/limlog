@@ -4,10 +4,7 @@ A Windower 4 addon for FFXI that tracks which Limbus chests you've opened this w
 
 In Temenos and Apollyon, a small draggable window shows the zone's towers, with the ones you've opened this week lit up, plus your chest count:
 
-```
-Temenos  N W E C  2/5
-Last clear: N3 2:14
-```
+![The limlog window in Temenos, showing towers N, W, E and C, a 0/5 chest count, and no last clear yet](limlog.png)
 
 - **Towers:** N, W, E, C in Temenos and NW, SW, NE, SE in Apollyon.
 - **Counter:** chests opened in this zone this week, out of the weekly limit of 5. Chests opened with Unique Data count too, so it can go past 5.
