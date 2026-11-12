@@ -11,8 +11,9 @@
 
 local ring = {}
 
-local SEGMENTS = 32
-local DOT_SIZE = 4
+local SEGMENTS = 72     -- enough dots to overlap into a solid line
+local DOT_SIZE = 8      -- pixels at about 8 yalms from the camera
+local MIN_DOT_SIZE = 4  -- pixels; keeps the ring readable from far away
 local MAX_DISTANCE = 50 -- yalms; hidden beyond this
 local FADE_START = 30   -- yalms; fades out from here to MAX_DISTANCE
 local MAX_HEIGHT = 20   -- yalms above or below you before the spot counts as another floor
@@ -20,7 +21,7 @@ local MAX_HEIGHT = 20   -- yalms above or below you before the spot counts as an
 local pool = 0
 
 local function name(i)
-    return ('limlog_ring_%02d'):format(i)
+    return ('limlog_ring_%03d'):format(i)
 end
 
 -- DirectX row vectors: v' = v * M, with m[row][column].
@@ -120,7 +121,7 @@ function ring.draw(spot, me, radius, color)
             spot.z, vw, vh)
         if sx then
             -- Shrink with depth so the ring keeps a steady thickness instead of ballooning up close.
-            local size = math.max(1, math.min(DOT_SIZE * 8 / depth, DOT_SIZE * 3))
+            local size = math.max(MIN_DOT_SIZE, math.min(DOT_SIZE * 8 / depth, DOT_SIZE * 3))
             windower.prim.set_position(name(i), sx - size / 2, sy - size / 2)
             windower.prim.set_size(name(i), size, size)
             windower.prim.set_color(name(i), alpha, color.red, color.green, color.blue)
