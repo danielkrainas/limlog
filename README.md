@@ -10,6 +10,8 @@ In Temenos and Apollyon, a small draggable window shows the zone's towers, with 
 - **Counter:** chests opened in this zone this week, out of the weekly limit of 5. Chests opened with Unique Data count too, so it can go past 5.
 - **Last clear:** the floor you most recently finished and how long you spent on it. Turn this line off with `//limlog floortime`.
 
+When the zone's special code location is nearby, limlog also draws a red ring on the ground around it. Turn this off with `//limlog ring`.
+
 Status resets at the weekly Conquest tally, Monday 00:00 JST (Sunday 15:00 UTC).
 
 ## Install
@@ -27,6 +29,7 @@ Use `//limlog` or the short form `//lim`.
 | `//limlog mark <tower>` | Record a chest the addon missed, such as `//limlog mark nw` |
 | `//limlog unmark <tower>` | Take one chest for that tower off this week's status. The CSV isn't changed. |
 | `//limlog floortime` | Show or hide the last floor clear time |
+| `//limlog ring` | Show or hide the ring around the code location |
 | `//limlog csv` | Show where the CSV is saved |
 | `//limlog help` | List the commands |
 
@@ -83,6 +86,7 @@ Reward columns are blank if you got nothing of that type. Several items are sepa
 | --- | --- | --- |
 | `show_floor_time` | `true` | Show the last floor clear line |
 | `min_floor_seconds` | `15` | Ignore shorter stays, so passing through a floor doesn't count as a clear |
+| `code_ring` | | `enabled` (default `true`), `radius` in yalms (default `1.5`) and `color` of the code location ring |
 | `display` | | Window position, font and background. Drag the window to move it. |
 
 ## Limitations
@@ -92,6 +96,7 @@ Reward columns are blank if you got nothing of that type. Several items are sepa
   - Rewards appear in the right columns. If they're missing, they may take longer than about 7 seconds to arrive, and `REWARD_DELAY` in `limlog.lua` should go up.
   - `Last clear` updates after a warp. If it stays at `--`, the landing coordinates may be more than 20 yalms off.
 - **Floor time measures your stay, not the clear itself.** Warping off a floor you didn't finish still counts if you were there at least `min_floor_seconds`. A quick trip to a floor to open its chest counts too.
+- **The code location ring shows through walls.** Windower gives addons no depth information, so the ring is hidden beyond 50 yalms, fades out from 30 yalms, and is hidden when the spot is more than 20 yalms above or below you.
 - **Timing needs a warp onto the floor.** If you load the addon partway through a floor, that floor isn't timed.
 - **Only the eight tower chests are tracked.** Chests from the Central Temenos and Central Apollyon Notorious Monster fights have no known NPC IDs.
 

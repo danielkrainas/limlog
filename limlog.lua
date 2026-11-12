@@ -7,10 +7,16 @@ local config = require('config')
 local texts = require('texts')
 local res = require('resources')
 local limbus = require('limbus')
+local ring = require('ring')
 
 local defaults = {
     show_floor_time = true,
     min_floor_seconds = 15, -- shorter stays are passing through a floor, not clearing it
+    code_ring = {
+        enabled = true, -- red ring on the ground around the zone's special code location
+        radius = 1.5,   -- yalms
+        color = { alpha = 255, red = 255, green = 40, blue = 40 },
+    },
     display = {
         pos = { x = 300, y = 120 },
         bg = { alpha = 170, red = 0, green = 0, blue = 0 },
@@ -424,6 +430,20 @@ local function update_position(zone)
     end
 end
 
+-- Code location ring -----------------------------------------------------------------------------
+
+-- Redrawn every frame, not every tick: it's anchored to the camera, so throttling makes it lag behind.
+local function draw_code_ring(zone)
+    local index = limbus.code_locations[zone]
+    if not settings.code_ring.enabled or not character or not index then
+        ring.hide()
+        return
+    end
+    -- The client only knows about NPCs near you, so a missing mob means the spot isn't nearby.
+    ring.draw(windower.ffxi.get_mob_by_index(index), windower.ffxi.get_mob_by_target('me'),
+        settings.code_ring.radius, settings.code_ring.color)
+end
+
 -- Lifecycle ---------------------------------------------------------------------------------------
 
 local function start(name)
@@ -445,6 +465,11 @@ windower.register_event('login', start)
 windower.register_event('logout', function()
     character, chest, position, floor = nil, nil, nil, nil
     box:hide()
+    ring.hide()
+end)
+
+windower.register_event('unload', function()
+    ring.destroy()
 end)
 
 windower.register_event('zone change', function()
@@ -456,6 +481,9 @@ windower.register_event('zone change', function()
 end)
 
 windower.register_event('prerender', function()
+    local zone = current_zone()
+    draw_code_ring(zone)
+
     local now = os.clock()
     if now < next_tick then
         return
@@ -463,7 +491,6 @@ windower.register_event('prerender', function()
     next_tick = now + TICK_SECONDS
 
     -- Login and zoning don't always give a usable zone at event time, so visibility is kept in sync here.
-    local zone = current_zone()
     local in_limbus = character ~= nil and limbus.zones[zone] ~= nil
     if box:visible() ~= in_limbus then
         refresh()
@@ -553,6 +580,7 @@ local function print_help()
     say('//limlog mark <tower> - record a chest the addon missed')
     say('//limlog unmark <tower> - take one chest off this week\'s status')
     say('//limlog floortime - show or hide the last floor clear time')
+    say('//limlog ring - show or hide the red ring around the code location')
     say('//limlog csv - show where the CSV is saved')
 end
 
@@ -563,6 +591,10 @@ windower.register_event('addon command', function(command, arg)
         config.save(settings)
         refresh()
         say('Floor clear time ' .. (settings.show_floor_time and 'shown.' or 'hidden.'))
+    elseif command == 'ring' then
+        settings.code_ring.enabled = not settings.code_ring.enabled
+        config.save(settings)
+        say('Code location ring ' .. (settings.code_ring.enabled and 'shown.' or 'hidden.'))
     elseif command == 'status' or command == 'mark' or command == 'unmark' or command == 'csv' then
         if not character then
             say('Log in first.')

@@ -21,6 +21,12 @@ limbus.chests = {
     [16933566] = { zone = 38, tower = 'SE', floor = 4 },
 }
 
+-- Mob index (the low 12 bits of the NPC id) of each zone's special code location.
+limbus.code_locations = {
+    [37] = 0x1F5,
+    [38] = 0x289,
+}
+
 -- Where a floor warp puts you. Windower axes: x and y are horizontal, z is height. No two landings in a zone
 -- share a horizontal position, so height is left out.
 limbus.landings = {
